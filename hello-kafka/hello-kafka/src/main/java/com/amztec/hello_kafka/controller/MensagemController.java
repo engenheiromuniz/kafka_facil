@@ -3,6 +3,7 @@ package com.amztec.hello_kafka.controller;
 import com.amztec.hello_kafka.config.TopicoConfig;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -21,7 +22,8 @@ public class MensagemController {
 	}
 	
 	@PostMapping
-	public String enviar(@RequestParam String texto) {		
+	//public String enviar(@RequestParam String texto) {
+	public String enviar(@RequestBody String texto) {  
 		kafkaTemplate.send(TopicoConfig.TOPICO, texto);
 		return "Mensagem enviada: "+texto;
 	}

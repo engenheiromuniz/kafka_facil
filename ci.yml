@@ -1,0 +1,75 @@
+# Pipeline de CI/CD do laboratório Kafka
+# CI: em todo push e pull request, sobe o Kafka, compila e roda os testes.
+# CD (Continuous Delivery): em push na main, gera e publica a imagem Docker no ghcr.io.
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build-e-testes:
+    name: Build e testes
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Baixar o código do repositório
+        uses: actions/checkout@v4
+
+      - name: Subir o Kafka do docker-compose.yml
+        # --wait espera o healthcheck do Kafka ficar "healthy"
+        run: docker compose up -d --wait kafka
+
+      - name: Configurar Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: hello-kafka/pom.xml
+
+      - name: Compilar e rodar os testes
+        working-directory: hello-kafka
+        run: mvn -B verify
+
+      - name: Mostrar logs do Kafka se algo falhar
+        if: failure()
+        run: docker compose logs kafka
+
+  publicar-imagem:
+    name: Publicar imagem Docker
+    needs: build-e-testes
+    # Só publica em push na main (não em pull requests)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Baixar o código do repositório
+        uses: actions/checkout@v4
+
+      - name: Definir o nome da imagem (o registry exige minúsculas)
+        run: echo "IMAGEM=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/hello-kafka" >> "$GITHUB_ENV"
+
+      - name: Login no GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build e push da imagem
+        uses: docker/build-push-action@v6
+        with:
+          context: hello-kafka
+          push: true
+          tags: |
+            ${{ env.IMAGEM }}:latest
+            ${{ env.IMAGEM }}:${{ github.sha }}

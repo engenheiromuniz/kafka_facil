@@ -1,5 +1,6 @@
-# Sobe o Kafka (modo KRaft, sem Zookeeper) + Kafka UI
-# Uso: docker compose up -d
+# Sobe o Kafka (modo KRaft, sem Zookeeper) + Kafka UI + Aplicação Spring
+# Uso padrão: docker compose up -d (Sobe apenas Kafka e Kafka UI)
+# Uso completo: docker compose --profile app up -d --build (Sobe tudo, incluindo o app)
 services:
   kafka:
     image: apache/kafka:3.8.0
@@ -41,3 +42,16 @@ services:
     depends_on:
       kafka:
         condition: service_healthy
+
+  # --- O QUE MUDOU: ADIÇÃO DO SEU MICROSERVIÇO ---
+  hello-kafka:
+    profiles: ["app"]
+    build: ./hello-kafka     # Altere para o caminho relativo correto da pasta do seu app se necessário
+    container_name: hello-kafka
+    ports:
+      - "8080:8080"          # Expõe a porta do Spring para sua máquina física
+    environment:
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092 # Sobrescreve o localhost do seu application.yml dentro do Docker
+    depends_on:
+      kafka:
+        condition: service_healthy # Garante que o Spring só tente iniciar quando o Kafka estiver 100% pronto
